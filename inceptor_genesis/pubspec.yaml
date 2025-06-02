@@ -1,0 +1,20 @@
+name: inceptor_genesis
+description: A starting point for Dart libraries or applications.
+version: 1.0.0
+# repository: https://github.com/my_org/my_repo
+
+environment:
+  sdk: ^3.7.2
+
+# Add regular dependencies here.
+dependencies:
+  # path: ^1.8.0
+  pointycastle: ^4.0.0
+  convert: ^3.1.2
+  crypto: ^3.0.6
+  web_socket_channel: ^3.0.3
+  http: ^1.4.0
+
+dev_dependencies:
+  lints: ^5.1.1
+  test: ^1.24.0

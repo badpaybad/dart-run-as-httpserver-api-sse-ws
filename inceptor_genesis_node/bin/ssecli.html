@@ -1,0 +1,10 @@
+<script>
+
+    const evtSource = new EventSource("http://127.0.0.1:21213/sse");
+    evtSource.onmessage = function (event) {
+        console.log("Received:", event.data);
+    };
+
+    console.log("123");
+
+</script>
