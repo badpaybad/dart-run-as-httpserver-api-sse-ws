@@ -17,31 +17,32 @@ inceptor_genesis_node/bin/inceptor_genesis_node.dart
 
 # dart create -t package-simple my_package
 
-my_package/
-├── lib/
-│   └── my_package.dart   <-- file chính export code của bạn
-├── test/
-├── pubspec.yaml
+                    my_package/
+                    ├── lib/
+                    │   └── my_package.dart   <-- file chính export code của bạn
+                    ├── test/
+                    ├── pubspec.yaml
 
 
 # dart create -t console-full my_blockchain_node
 
 
-my_blockchain_node/
-├── bin/
-│   └── main.dart        👈 Entry point (start node here)
-├── lib/
-│   ├── blockchain.dart  👈 Block & Chain logic
-│   ├── p2p.dart         👈 P2P networking logic
-│   └── node.dart        👈 Full node controller
-├── data/
-│   └── blockchain.json  👈 Lưu local blockchain
-├── pubspec.yaml
+                    my_blockchain_node/
+                    ├── bin/
+                    │   └── main.dart        👈 Entry point (start node here)
+                    ├── lib/
+                    │   ├── blockchain.dart  👈 Block & Chain logic
+                    │   ├── p2p.dart         👈 P2P networking logic
+                    │   └── node.dart        👈 Full node controller
+                    ├── data/
+                    │   └── blockchain.json  👈 Lưu local blockchain
+                    ├── pubspec.yaml
 
 # Sử dụng package trong project console-full
-/workspace
-  ├── my_package/
-  └── my_console_app/
+
+                    /workspace
+                    ├── my_package/
+                    └── my_console_app/
 
                     
                     Trong my_console_app/pubspec.yaml, thêm phần path dependency:
