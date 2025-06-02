@@ -13,7 +13,9 @@ inceptor_genesis_node/bin/inceptor_genesis_node.dart
                         cd inceptor_genesis_node
                         dart run
 
+# docker file 
 
+check dockerfile
 
 # dart create -t package-simple my_package
 

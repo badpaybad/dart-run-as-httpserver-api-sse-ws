@@ -34,24 +34,3 @@ EXPOSE 21213
 
 # Chạy executable
 CMD ["/app/inceptor_genesis_node"]
-
-# docker build -f "dockerfile" -t dockerregistry.airobotics.vn/inceptor_genesis_node .
-# docker push dockerregistry.airobotics.vn/inceptor_genesis_node
-# docker pull dockerregistry.airobotics.vn/inceptor_genesis_node
-
-#  sudo docker rm -f inceptor_genesis_node
-
-# docker system prune -a -f
-# docker volume prune -f
-# docker builder prune -f
-
-# sudo docker run -d --restart=always --name inceptor_genesis_node dockerregistry.airobotics.vn/inceptor_genesis_node
-
-# docker logs -f inceptor_genesis_node
-# docker system df
-# sudo docker logs -f inceptor_genesis_node
-
-
-# sudo docker exec -it inceptor_genesis_node /bin/bash
-# sudo docker exec -it 5adc42619558 /bin/sh
-# sudo docker logs -f airoboticscms
