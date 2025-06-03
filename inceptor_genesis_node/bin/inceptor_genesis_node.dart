@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
+import 'package:inceptor_genesis/src/string_cipher.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:http/http.dart' as http;
 
@@ -16,7 +17,7 @@ Future<void> client_connect() async {
       body: {"date": "request test at ${DateTime.now().toIso8601String()}"},
     );
 
-    print("reponse from api: ${r.body}");
+    print("repose from api: ${r.body}");
   }, "http://127.0.0.1:21213/api/ping");
 
   await Isolate.spawn((urisse) async {
@@ -28,7 +29,6 @@ Future<void> client_connect() async {
     request.headers.set(HttpHeaders.connectionHeader, 'keep-alive');
     request.headers.set(HttpHeaders.contentTypeHeader, 'text/event-stream');
     request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
-    //
 
     final response = await request.close();
 
@@ -54,32 +54,65 @@ Future<void> client_connect() async {
   }, "http://127.0.0.1:21213/sse");
 
   await Isolate.spawn((uriws) async {
-    //client web socket
-    print("start ws client node connect to: ${uriws}");
-    final channel = WebSocketChannel.connect(Uri.parse("$uriws"));
-    final name = 'WsClient#${Isolate.current.hashCode}';
+    // //client web socket
+    // print("start ws client node connect to: ${uriws}");
+    // final channel = WebSocketChannel.connect(Uri.parse("$uriws"));
+    // final name = 'WsClient#${Isolate.current.hashCode}';
 
-    // Nghe tin nhắn từ server
-    channel.stream.listen(
-      (message) async {
-        print('$name received: $message');
-        await Future.delayed(Duration(seconds: 5));
-        channel.sink.add('$name:PING');
-      },
-      onDone: () {
-        print('$name disconnected');
-      },
-      onError: (e) {
-        print('$name error: $e');
-      },
-    );
+    // // Nghe tin nhắn từ server
+    // channel.stream.listen(
+    //   (message) async {
+    //     print('$name received: $message');
+    //     await Future.delayed(Duration(seconds: 5));
+    //     channel.sink.add('$name:PING');
+    //   },
+    //   onDone: () {
+    //     print('$name disconnected');
+    //   },
+    //   onError: (e) {
+    //     print('$name error: $e');
+    //   },
+    // );
 
-    // Gửi tin nhắn sau khi kết nối
-    channel.sink.add('$name:PING');
+    // // Gửi tin nhắn sau khi kết nối
+    // channel.sink.add('$name:PING');
+
+    try {
+      final socket = await WebSocket.connect(uriws);
+      print('Đã kết nối đến server');
+
+      socket.listen((data) {
+        print('Nhận từ server: $data');
+      });
+
+      socket.add('Xin chào từ client');
+
+      // Đóng sau vài giây để demo
+      await Future.delayed(Duration(seconds: 5));
+      await socket.close();
+    } catch (e) {
+      print('Lỗi kết nối WebSocket: $e');
+    }
   }, "ws://0.0.0.0:21213/ws");
 }
 
 Future<void> main(List<String> arguments) async {
+  FullNoteTest().StartLoop();
+  LeecherTest().StartLoop();
+
+  StringCipher strCipher = StringCipher();
+
+  var kp = strCipher.generate();
+
+  var strtest = "Nguyen Phan Du";
+
+  var signed = strCipher.sign(strtest, kp.key!);
+
+  print(signed);
+  var oki = strCipher.verify(strtest, signed, kp.val!);
+
+  print(oki);
+
   print('Hello world: ${inceptor_genesis_node.calculate()}!');
 
   final server = await HttpServer.bind(InternetAddress.anyIPv4, 21213);
@@ -99,6 +132,7 @@ Future<void> main(List<String> arguments) async {
 
     if (request.uri.path.startsWith('/ws') &&
         WebSocketTransformer.isUpgradeRequest(request)) {
+      response.statusCode = HttpStatus.ok;
       WebSocket socket = await WebSocketTransformer.upgrade(request);
       print('Ws Client connected');
 
@@ -132,7 +166,7 @@ Future<void> main(List<String> arguments) async {
       Timer? timer;
       if (response.persistentConnection) {
         try {
-          // CRITICAL: Set headers BEFORE checking persistentConnection
+          response.statusCode = HttpStatus.ok;
 
           // Add client to the set
           _sse_clients.add(response);
@@ -215,8 +249,6 @@ Future<void> main(List<String> arguments) async {
       await response.close();
     }
   }
-  var a = Awesome();
-  print(a);
 
   while (true) {
     await Future.delayed(Duration(seconds: 1));
