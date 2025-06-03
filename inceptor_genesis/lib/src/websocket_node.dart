@@ -85,7 +85,7 @@ class WebsocketNode {
 
       if (_localLanIp != null) {
         var ipslan = _ipLanSameSubnet(_localLanIp!);
-        ipslan = ["192.168.4.248"];
+        // ipslan = ["192.168.4.248"];
         for (var ip in ipslan) {
           await _validIp2ConnectNode(ip);
           await Future.delayed(Duration(seconds: 1));
