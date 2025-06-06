@@ -1,69 +1,48 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:inceptor_genesis/inceptor_genesis.dart';
+import 'package:inceptor_genesis/src/message_base.dart';
+import 'package:inceptor_genesis/src/message_chat.dart';
 import 'package:inceptor_genesis/src/object_id.dart';
 import 'package:inceptor_genesis/src/string_cipher.dart';
 import 'package:json_annotation/json_annotation.dart';
 
-@JsonSerializable()
-class Message {
-  final StringCipher _cipher = StringCipher();
+class ChatDomain {
+  FullNode fullNode;
+  String? owner;
 
-  String? nodeId;
-  String? fromAddress;
-  String? toAddress;
-  String id = "${ObjectId()}";
-  bool? isServer;
-  String? dataType;
-  String? data;
-  String? messageSigned;
+  List<ChatGroup> groups = [];
 
-  //this dont use to sign or verify
-  int? trackingCounter = 0;
+  ChatDomain(this.fullNode, this.owner) {}
 
-  Message() {}
-
-  void sign(String priveateKeyBase64) {
-    var dataRaw =
-        "$nodeId $fromAddress $toAddress $id $isServer $dataType $data";
-    messageSigned = _cipher.sign(dataRaw, priveateKeyBase64);
+  void creatGroup(String? name) {
+    var g = ChatGroup(fullNode, owner);
+    g.name = name;
+    groups.add(g);
   }
+}
 
-  bool verify() {
-    var dataRaw =
-        "$nodeId $fromAddress $toAddress $id $isServer $dataType $data";
-    return _cipher.verify(dataRaw, messageSigned!, nodeId!);
-  }
+class ChatGroup {
+  ObjectId id = ObjectId();
+  bool? isPrivate;
+  String? name;
 
-  factory Message.fromJson(Map<String, dynamic> json) {
-    Message msg = Message();
-    msg.nodeId = json["nodeId"];
-    msg.fromAddress = json["fromAddress"];
-    msg.toAddress = json["toAddress"];
-    msg.id = json["id"];
-    msg.isServer = json["isServer"];
-    msg.dataType = json["dataType"];
-    msg.data = json["data"];
-    msg.messageSigned = json["messageSigned"];
-    msg.trackingCounter = json["trackingCounter"];
+  String? owner;
 
-    return msg;
-  }
+  Map<String, String> members = {};
 
-  Map<String, dynamic> toJson() {
-    return {
-      "nodeId": nodeId,
-      "fromAddress": fromAddress,
-      "toAddress": toAddress,
-      "id": id,
-      "isServer": isServer,
-      "dataType": dataType,
-      "data": data,
-      "messageSigned": messageSigned,
-      "trackingCounter": trackingCounter,
-    };
-  }
+  List<MessageChat> messages = [];
 
-  @override
-  String toString() {
-    return jsonEncode(this);
+  Map<String, String> invitedMembers = {};
+
+  FullNode fullNode;
+
+  ChatGroup(this.fullNode, this.owner) {}
+
+  void inviteFriends(List<String> friends) {
+    for (var m in friends) {
+      invitedMembers[m] = m;
+      // fullNode.sendChatMessage(toAddress, msgData)
+    }
   }
 }

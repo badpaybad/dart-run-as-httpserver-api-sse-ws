@@ -10,5 +10,6 @@ import 'package:inceptor_genesis_node/inceptor_genesis_node.dart'
 import 'package:inceptor_genesis/inceptor_genesis.dart';
 
 Future<void> main(List<String> arguments) async {
+
   FullNoteTest().StartLoop();
 }

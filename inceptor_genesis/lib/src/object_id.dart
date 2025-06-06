@@ -1,7 +1,39 @@
 import 'dart:math';
+import 'dart:io';
 import 'dart:typed_data';
 
 class ObjectId {
+  static Future<String> getMachineId() async {
+    if (Platform.isLinux) {
+      final result = await Process.run('cat', ['/etc/machine-id']);
+      return result.stdout.toString().trim();
+    }
+
+    if (Platform.isMacOS) {
+      final result = await Process.run('ioreg', [
+        '-rd1',
+        '-c',
+        'IOPlatformExpertDevice',
+      ]);
+      final match = RegExp(
+        r'"IOPlatformUUID" = "(.+)"',
+      ).firstMatch(result.stdout);
+      return match?.group(1) ?? '';
+    }
+
+    if (Platform.isWindows) {
+      final result = await Process.run('wmic', ['csproduct', 'get', 'UUID']);
+      final lines = result.stdout.toString().trim().split('\n');
+      if (lines.length >= 2) {
+        return lines[1].trim();
+      } else {
+        return '';
+      }
+    }
+
+    return '';
+  }
+
   static final Random _random = Random.secure();
   static final int _machineId = _random.nextInt(0xFFFFFF); // 3 bytes
   static final int _processId = _random.nextInt(0xFFFF); // 2 bytes

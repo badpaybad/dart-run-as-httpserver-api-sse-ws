@@ -6,7 +6,7 @@ import 'package:inceptor_genesis/src/key_pair.dart';
 import 'package:inceptor_genesis/src/string_cipher.dart';
 
 class WebsocketNode {
-  StringCipher _cipher = StringCipher();
+  final StringCipher _cipher = StringCipher.instance;
 
   //ip:port
   final List<String> nodeAddresses;
@@ -65,7 +65,8 @@ class WebsocketNode {
     return null;
   }
 
-  void Function(String, bool)? _handlerIncomming;
+  Map<String, Future<void> Function(WebSocket, String, bool)>
+  _handlersIncomming = {};
 
   String? _localLanIp;
   String? _publicIp;
@@ -74,6 +75,12 @@ class WebsocketNode {
     : selfIp = selfIpPort.split(':')[0],
       selfPort = int.parse(selfIpPort.split(":")[1]) {
     //
+
+    var ipPortApi =
+        "http://$selfIp:$selfPort/nodes/valid/${Uri.encodeComponent(keyDiscoveryTester!.val!)}";
+
+    print("restful api: $ipPortApi");
+
     var tdiscovery = Timer.periodic(Duration(seconds: 60), (t) async {
       if (_isShutdown) {
         t?.cancel();
@@ -85,7 +92,7 @@ class WebsocketNode {
 
       if (_localLanIp != null) {
         var ipslan = _ipLanSameSubnet(_localLanIp!);
-        // ipslan = ["192.168.4.248"];
+        ipslan = ["192.168.4.248"];
         for (var ip in ipslan) {
           await _validIp2ConnectNode(ip);
           await Future.delayed(Duration(seconds: 1));
@@ -137,11 +144,23 @@ class WebsocketNode {
     }
   }
 
+  bool _isStarted = false;
+
   /// Khởi động server và kết nối đến các node khác
-  Future<void> start(void Function(String, bool) handlerIncomming) async {
-    _handlerIncomming = handlerIncomming;
+  Future<void> start(
+    Future<void> Function(WebSocket, String, bool) handlerIncomming,
+  ) async {
+    _handlersIncomming["__main__"] = handlerIncomming;
     await _startSelfServer();
+    _isStarted = true;
     _connectToOtherNodes();
+  }
+
+  Future<void> addHandlerIncomming(
+    String subscriberName,
+    Future<void> Function(WebSocket, String, bool) handlerIncomming,
+  ) async {
+    _handlersIncomming["$subscriberName"] = handlerIncomming;
   }
 
   /// WebSocket server lắng nghe các node khác
@@ -151,7 +170,9 @@ class WebsocketNode {
     } else {
       selfServer = await HttpServer.bind(selfIp, selfPort);
     }
-    print('$selfIpPort WebSocket server đang chạy tại ws://$selfIp:$selfPort');
+    print(
+      '$selfIpPort WebSocket server đang chạy tại ws://$selfIp:$selfPort/ws',
+    );
 
     // iplan = await getLocalIpAddress(itype: InternetAddressType.IPv6);
     // if (iplan != null && iplan.isNotEmpty) {
@@ -186,7 +207,8 @@ class WebsocketNode {
           ..write(jsonEncode({"ips": ips, "signed": ipsSigned}))
           ..close();
         return;
-      } else if (WebSocketTransformer.isUpgradeRequest(request)) {
+      } else if (request.uri.path.startsWith('/ws') &&
+          WebSocketTransformer.isUpgradeRequest(request)) {
         final socket = await WebSocketTransformer.upgrade(request);
         clientsConnectedFromOthers.add(socket);
         var socketaddrport =
@@ -194,7 +216,7 @@ class WebsocketNode {
         print('$selfIpPort Client server mới kết nối: $socketaddrport');
 
         socket.listen(
-          (data) => _handleIncoming(data, isServerSide: true),
+          (data) => _handleIncoming(socket, data, isServerSide: true),
           onDone: () {
             print('$socketaddrport Client ngắt kết nối khỏi server');
             clientsConnectedFromOthers.remove(socket);
@@ -244,14 +266,14 @@ class WebsocketNode {
 
     if (socketsConnect2OtherNodes.containsKey(address)) return;
 
-    final url = 'ws://$address';
+    final url = 'ws://$address/ws';
     try {
       final socket = await WebSocket.connect(url);
       socketsConnect2OtherNodes[address] = socket;
       print('$selfIpPort Đã kết nối tới $address');
 
       socket.listen(
-        (data) => _handleIncoming(data, isServerSide: false),
+        (data) => _handleIncoming(socket, data, isServerSide: false),
         onDone: () {
           print('$selfIpPort Ngắt kết nối từ $address');
           socketsConnect2OtherNodes.remove(address);
@@ -304,13 +326,25 @@ class WebsocketNode {
     }
   }
 
-  void _handleIncoming(String jsondata, {required bool isServerSide}) {
+  Future<void> sendData(WebSocket socket, String jsondata) async {
+    if (socket.readyState == WebSocket.open) {
+      socket.add(jsondata);
+    }
+  }
+
+  void _handleIncoming(
+    WebSocket srcSocket,
+    String jsondata, {
+    required bool isServerSide,
+  }) {
     // try {
     //   // TODO: xử lý tùy logic ứng dụng
     // } catch (e) {
     //   print('Dữ liệu không hợp lệ: $e');
     // }
-    _handlerIncomming!(jsondata, isServerSide);
+    for (var h in _handlersIncomming.values) {
+      h(srcSocket, jsondata, isServerSide);
+    }
   }
 
   bool _isShutdown = false;
@@ -325,3 +359,42 @@ class WebsocketNode {
     selfServer?.close();
   }
 }
+/**
+ * 
+ * 
+ * 
+upstream blockchainairoboticsvn  {
+    server                    10.10.10.104:21213 fail_timeout=0;
+}
+
+ server {
+    listen 21213;
+    server_name airobotics.vn;
+
+    location /nodes/ {
+        proxy_pass http://blockchainairoboticsvn;  
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        add_header Access-Control-Allow-Origin *;
+      add_header Access-Control-Allow-Headers *;
+    }
+
+    location /ws {
+        proxy_pass http://blockchainairoboticsvn;  
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        
+        proxy_read_timeout 86400;
+        proxy_send_timeout 86400;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        add_header Access-Control-Allow-Origin *;
+      add_header Access-Control-Allow-Headers *;
+    }
+}
+curl --location 'http://10.10.10.104:21213/nodes/valid/BEJW3kZ38Nhq6GtClzxsnpdPWX499s3PlIyFvAcO4SHKRbYhGfVHw1fXPAJ2LdI%2FdNVqsF1Rox4s3I5GWtQ6E9A%3D'
+ */
