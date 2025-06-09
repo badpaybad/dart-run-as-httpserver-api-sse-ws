@@ -6,6 +6,7 @@ import 'package:inceptor_genesis/src/cipher.dart';
 import 'package:inceptor_genesis/src/encrypted_key_aes.dart';
 import 'package:inceptor_genesis/src/key_pair.dart';
 
+/// base64 for private public key
 class StringCipher {
   static final StringCipher instance = StringCipher._();
 
@@ -82,16 +83,16 @@ class StringCipher {
   }
 
   Uint8List aesEncryptData(Uint8List dataRaw, String aesKey) {
-    var key = sha256.convert(utf8.encode(aesKey)).bytes;
-    var iv = Uint8List.fromList(key.sublist(0, 16));
+    var hasedkey = sha256.convert(utf8.encode(aesKey)).bytes;
+    var iv = Uint8List.fromList(md5.convert(hasedkey).bytes);
 
-    return _cipher.aesEncryptData(dataRaw, Uint8List.fromList(key), iv);
+    return _cipher.aesEncryptData(dataRaw, Uint8List.fromList(hasedkey), iv);
   }
 
   Uint8List aesDecryptData(Uint8List dataEncrypted, String aesKey) {
-    var key = sha256.convert(utf8.encode(aesKey)).bytes;
-    var iv = Uint8List.fromList(key.sublist(0, 16));
+    var hasedkey = sha256.convert(utf8.encode(aesKey)).bytes;
+    var iv = Uint8List.fromList(md5.convert(hasedkey).bytes);
 
-    return _cipher.aesDecryptData(dataEncrypted, Uint8List.fromList(key), iv);
+    return _cipher.aesDecryptData(dataEncrypted, Uint8List.fromList(hasedkey), iv);
   }
 }

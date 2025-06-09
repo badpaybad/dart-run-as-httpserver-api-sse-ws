@@ -43,7 +43,7 @@ class RequestResponse implements MessageBase, IEntity {
   String? messageSigned;
   @override
   int createdAt = DateTime.now().toUtc().millisecondsSinceEpoch;
-  //this dont use to sign or verify, this use to count how many time msg re-broadcast
+  ///this dont use to sign or verify, this use to count how many time msg re-broadcast
   @override
   int? trackingCounter = 0;
 

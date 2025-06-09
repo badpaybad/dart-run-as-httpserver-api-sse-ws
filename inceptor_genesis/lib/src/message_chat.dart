@@ -7,7 +7,8 @@ import 'package:json_annotation/json_annotation.dart';
 
 @JsonSerializable()
 class MessageChatData {
-  String? type; //invite, text, invite_accepted
+  /// enum: invited, text, invite_accepted,request_ai_compute 
+  String? type; 
   String? jsonData;
 
   MessageChatData({this.type, this.jsonData});

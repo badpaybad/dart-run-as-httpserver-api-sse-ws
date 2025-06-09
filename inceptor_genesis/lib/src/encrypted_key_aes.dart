@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:inceptor_genesis/inceptor_genesis.dart';
-
+/// transaction se ma hoa key aes = buyer public key, buyer dung private key lay key aes. dung key aes de giai ma lay data  
 class EncryptedKeyAes {
   String? base64EphemeralPublicKey;
   String? base64Iv;
@@ -10,7 +10,7 @@ class EncryptedKeyAes {
   final StringCipher _cipher = StringCipher.instance;
 
   EncryptedKeyAes();
-
+  // ma hoa key aes = public key
   EncryptedKeyAes setKeyAes(String publicKeyBase64, String keyAes) {
     var temp = _cipher.keyAesEncrypt(keyAes, publicKeyBase64);
     this.base64EphemeralPublicKey = temp.base64EphemeralPublicKey;
@@ -19,15 +19,15 @@ class EncryptedKeyAes {
 
     return this;
   }
-
+  /// gia ma lay key aes = private key
   String getKeyAes(String priveateKeyBase64) {
     return _cipher.keyAesDecrypt(this, priveateKeyBase64);
   }
-
+  /// ma hoa data = key aes
   Uint8List encryptData(Uint8List dataRaw, String aesKey) {
     return _cipher.aesEncryptData(dataRaw, aesKey);
   }
-
+  /// giai ma data = key aes 
   Uint8List decryptData(Uint8List encryptedData, String aesKey) {
     return _cipher.aesDecryptData(encryptedData, aesKey);
   }

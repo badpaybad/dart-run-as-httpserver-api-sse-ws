@@ -57,7 +57,7 @@ class FullNoteTest {
   Future<void> StartLoop() async {
     var ipnode0 = "0.0.0.0:21213";
 
-    //await Block.createGenesisBlock();
+    await Block.createGenesisBlock();
 
     var blockgenesis = Block.getGenesisBlock();
     Block blocktestmine = Block();

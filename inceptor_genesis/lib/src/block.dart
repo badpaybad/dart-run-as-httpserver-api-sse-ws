@@ -43,7 +43,6 @@ class Block implements MessageBase, IEntity {
 
   static Future<Block> createGenesisBlock() async {
     Block genesis = Block();
-    //todo: uncomment to do your own genesis block
     genesis.indexNo = 0;
     genesis.previousHash = "0";
     genesis.createdAt = DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -55,6 +54,11 @@ class Block implements MessageBase, IEntity {
     genesis.nonce = 0;
 
     await genesis.mine(-1, genesis._cipher.generateSha256(genesis.id));
+
+    if(genesis.isValidHash()== false){
+        throw Exception("Invalid hash");
+    }
+
     final file = File('/work/genesis.json');
     file.writeAsStringSync("$genesis");
 
@@ -64,7 +68,7 @@ class Block implements MessageBase, IEntity {
 
   static Block getGenesisBlock() {
     var obj = jsonDecode(
-      '{"nodeId":null,"id":"6842622f40254efd06c4b1ab","isServer":null,"dataType":"block","messageSigned":null,"trackingCounter":0,"createdAt":1749180975590,"indexNo":0,"previousHash":"677ec8e01273c73b286d27a37b9cf7f198dcc9e3e0f0757fa83fdca53be9e66e","hash":"a72b860af2b3170216c60dfbc43f2206099a0494f0c0974876b13022723e5baf","nonce":1749180975616,"difficulty":2,"merkleRoot":null,"gasLimit":10000.0,"gasUse":0.0,"trans":[],"reward":0.0}',
+      '{"nodeId":null,"id":"684655e0008b3bbb383d8a8e","isServer":null,"dataType":"block","messageSigned":null,"trackingCounter":0,"createdAt":1749439968181,"indexNo":0,"previousHash":"8bb6d534934c230befba18af65900790207c63929e5b89bca2fdeaaabdbffc86","hash":"5c177666006ce6d6d5c49b755cf4e1253062e6a9c120130273046ffc0f5df21e","nonce":1749439968221,"difficulty":2,"merkleRoot":null,"gasLimit":10000.0,"gasUse":0.0,"trans":[],"reward":0.0}',
     );
 
     Block genesis = Block.fromJson(obj);
@@ -73,7 +77,8 @@ class Block implements MessageBase, IEntity {
     return genesis;
   }
 
-  String calculateHash() {
+  String computeHash() {
+    //dont change this cause hash of getGenesisBlock depend on it 
     var dataRaw =
         "$nonce $difficulty $createdAt $nodeId $id $isServer $dataType $indexNo $previousHash $gasLimit $gasUse $reward ${jsonEncode(trans ?? [])}";
 
@@ -81,7 +86,7 @@ class Block implements MessageBase, IEntity {
   }
 
   bool isValidHash() {
-    return hash == calculateHash();
+    return hash == computeHash();
   }
 
   bool isHashMatchDifficulty(String hash) {
@@ -112,12 +117,13 @@ class Block implements MessageBase, IEntity {
   }
 
   Future<Block> mine(int previousIndexNo, String previousHash) async {
+    //base on logic should init other data for block before mine: eg reward ... 
     this.previousHash = previousHash;
     this.indexNo = previousIndexNo + 1;
     this.nonce = createdAt;
 
     while (true) {
-      this.hash = this.calculateHash();
+      this.hash = this.computeHash();
 
       if (isHashMatchDifficulty(this.hash!)) {
         break;

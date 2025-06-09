@@ -12,7 +12,7 @@ abstract class MessageBase {
   bool? isServer;
   int createdAt = DateTime.now().toUtc().millisecondsSinceEpoch;
 
-  //this dont use to sign or verify
+  /// this dont use to sign or verify
   int? trackingCounter = 0;
 
   void sign(String priveateKeyBase64);

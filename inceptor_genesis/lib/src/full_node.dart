@@ -25,10 +25,15 @@ class FullNode {
   List<MessageChat> sentChats = [];
   List<MessageChat> selfChats = [];
 
+  Block _genesis = Block.getGenesisBlock();
+
   Map<String, String> _trackingMessages = {};
   int _trackingCounterMax = 127;
 
   List<Block> blockchain = [Block.getGenesisBlock()];
+
+  ///-1:doing, 0: none, 1:done
+  int _consensusState = 0;
 
   FullNode(
     String ipPortSelf,
@@ -36,10 +41,56 @@ class FullNode {
     this.selfAddress = "",
   }) {
     init(ipPortSelf, ipPortNodes, selfaddress: this.selfAddress);
+
+    if (this.isChainValid(blockchain) == false) {
+      throw Exception("Your localchain not valid");
+    }
   }
 
   void connectTo(String ipport) {
     websocketNode?.connectToNode(ipport);
+  }
+
+  bool isChainValid(List<Block> chainOfBlocks) {
+    if (chainOfBlocks
+            .where(
+              (t) => t.toString() == _genesis.toString() && t.isValidHash(),
+            )
+            .length !=
+        1) {
+      //may be should check if 1st block in chain should be genesis;
+      return false;
+    }
+
+    for (int i = 1; i < chainOfBlocks.length; i++) {
+      final current = chainOfBlocks[i];
+      final previous = chainOfBlocks[i - 1];
+
+      if (current.hash != current.computeHash()) return false;
+      if (current.previousHash != previous.hash) return false;
+    }
+    return true;
+  }
+
+  bool consenusLongestChain(List<Block> receivedChain) {
+    _consensusState = -1;
+    if (isChainValid(receivedChain) == false) {
+      print(
+        "consenusLongestChain: receivedChain wrong, your local chain is correct",
+      );
+      return false;
+    }
+
+    if (receivedChain.length > blockchain.length) {
+      blockchain = receivedChain;
+
+      print(
+        "consenusLongestChain: receivedChain correct and longest, your local chain replace by receivedChain",
+      );
+    }
+    // print("consenusLongestChain: receivedChain == local blockchain");
+    _consensusState = 1;
+    return true;
   }
 
   void init(String ipPortSelf, List<String> ipPortNodes, {selfaddress = ""}) {
@@ -88,7 +139,10 @@ class FullNode {
         RequestResponseData data = RequestResponseData();
         data.type = "request_chains";
         await sendRequest(data);
-      } catch (e) {}
+        // print("scheduer.request_chains======================> $data");
+      } catch (e) {
+        print("ERROR: scheduler: request_chains: $e");
+      }
     });
   }
 
@@ -101,6 +155,19 @@ class FullNode {
     msg.sign(nodeAddress!.key!);
 
     websocketNode?.broadcast(jsonEncode(msg));
+  }
+
+  Future<void> _sendResponse(
+    WebSocket srcSocket,
+    RequestResponseData data,
+  ) async {
+    RequestResponse msg = RequestResponse();
+
+    msg.nodeId = nodeAddress!.val;
+    msg.data = data;
+
+    msg.sign(nodeAddress!.key!);
+    websocketNode?.sendData(srcSocket, jsonEncode(msg));
   }
 
   //todo: có thể  map 1-1 request-response bằng việc đăng ký Map<Function,Function> để  đưa sang quản lý ở class khác thay cho if else
@@ -121,12 +188,14 @@ class FullNode {
       data.type = "response_chains";
       data.jsonData = jsonEncode(blockchain);
       await _sendResponse(srcSocket, data);
+
+      // print("scheduer.response_chains======================> $data");
     } else if (request.data?.type == "response_chains") {
       List<Block> receivedChains =
           ((jsonDecode(request.data!.jsonData!) as List<dynamic>) ?? [])
               .map((txJson) => Block.fromJson(txJson))
               .toList();
-
+      consenusLongestChain(receivedChains);
       //todo: consensus here for  List<Block> blockchain
       /*✅ 1. Validate the received chain
 
@@ -176,19 +245,6 @@ class FullNode {
     }
   }
 
-  Future<void> _sendResponse(
-    WebSocket srcSocket,
-    RequestResponseData data,
-  ) async {
-    RequestResponse msg = RequestResponse();
-
-    msg.nodeId = nodeAddress!.val;
-    msg.data = data;
-
-    msg.sign(nodeAddress!.key!);
-    websocketNode?.sendData(srcSocket, jsonEncode(msg));
-  }
-
   Future<void> _chatHandle(MessageChat msg) async {
     if (msg != null && msg.verify()) {
       if (msg.toAddress != null &&
@@ -203,6 +259,21 @@ class FullNode {
         receivedChats.add(msg);
 
         print("${websocketNode?.selfIpPort} <----------< $msg");
+
+        /*
+        else if (request.data?.type == "request_ai_compute") {
+          //todo: if dont want computing re-broadcast  websocketNode?.broadcast(jsonEncode(msg));
+          //todo: split into parts broadcast each part{id} ( atless 3 node working ) 
+          //todo: do grid computing
+
+          // reply to msg.fromAddress sendChatMessage(msg.fromAddress,..data:{type:response_ai_compute}.., selfAddress,)
+        } 
+        else if (request.data?.type == "response_ai_compute" ) {
+          //todo: each part{id} will compare result (cause sent to atless 2 node)
+          //todo: combin grind computing all parts -> finally value computed 
+          //todo: if dont want computing re-broadcast  websocketNode?.broadcast(jsonEncode(msg));
+        }  
+        */
       } else {
         //if msg not belong to selfAddress
         msg.trackingCounter ??= 0;
@@ -210,6 +281,7 @@ class FullNode {
         if (msg.trackingCounter! >= _trackingCounterMax) {
           //msg rich end of life
         } else {
+          //re-broadcast
           websocketNode?.broadcast(jsonEncode(msg));
         }
       }
@@ -237,7 +309,18 @@ class FullNode {
     msg.nodeId = nodeAddress!.val;
     msg.data = msgData;
     msg.toAddress = toAddress;
+    /*
+    else if (request.data?.type == "request_ai_compute") {
 
+      //todo: split into parts broadcast each part{id} ( atless 3 node working ) 
+      //todo: do grid computing
+    } 
+    else if (request.data?.type == "response_ai_compute") {
+      //todo: each part{id} will compare result (cause sent to atless 2 node)
+      //todo: combin grind computing all parts -> finally value computed 
+      //todo: if dont want computing re-broadcast 
+    }  
+    */
     msg.sign(nodeAddress!.key!);
 
     sentChats.add(msg);

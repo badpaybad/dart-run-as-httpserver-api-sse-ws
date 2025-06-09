@@ -205,7 +205,7 @@ extension AesCipher on Cipher {
   EncryptedKeyAes encryptAESKey(Uint8List aesKey, ECPublicKey buyerPublicKey) {
     // 1. Tạo ephemeral key pair
     final ephemeralKeys = generateKeyPair(
-      yourSecretPhase: "$ObjectId() $_getSecureRandom()",
+      yourSecretPhase: "$ObjectId() $_getSecureRandom() ${encodePublicKey(buyerPublicKey)}",
     );
 
     //   var xxx=encodePublicKey(ephemeralKeys.publicKey);
