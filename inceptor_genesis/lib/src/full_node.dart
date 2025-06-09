@@ -47,8 +47,8 @@ class FullNode {
     }
   }
 
-  void connectTo(String ipport) {
-    websocketNode?.connectToNode(ipport);
+  void connectTo(String ipport, bool isIpPortLan) {
+    websocketNode?.connectToNode(ipport, isIpPortLan);
   }
 
   bool isChainValid(List<Block> chainOfBlocks) {
@@ -133,7 +133,7 @@ class FullNode {
       }
     });
 
-    Timer scheduer = Timer.periodic(Duration(seconds: 60), (t) async {
+    Future<void> _requestOtherNodes2ConsensusChain() async {
       try {
         //asking chain from other request_response.data.type="request_chains"
         RequestResponseData data = RequestResponseData();
@@ -143,7 +143,13 @@ class FullNode {
       } catch (e) {
         print("ERROR: scheduler: request_chains: $e");
       }
-    });
+
+      await Future.delayed(Duration(seconds: 60));
+
+      await _requestOtherNodes2ConsensusChain();
+    }
+
+    _requestOtherNodes2ConsensusChain();
   }
 
   Future<void> sendRequest(RequestResponseData data) async {
@@ -263,7 +269,6 @@ class FullNode {
         /*
         else if (request.data?.type == "request_ai_compute") {
           //todo: if dont want computing re-broadcast  websocketNode?.broadcast(jsonEncode(msg));
-          //todo: split into parts broadcast each part{id} ( atless 3 node working ) 
           //todo: do grid computing
 
           // reply to msg.fromAddress sendChatMessage(msg.fromAddress,..data:{type:response_ai_compute}.., selfAddress,)
@@ -279,6 +284,7 @@ class FullNode {
         msg.trackingCounter ??= 0;
         msg.trackingCounter = msg.trackingCounter! + 1;
         if (msg.trackingCounter! >= _trackingCounterMax) {
+          print("msg was end of life: $msg");
           //msg rich end of life
         } else {
           //re-broadcast
@@ -315,11 +321,7 @@ class FullNode {
       //todo: split into parts broadcast each part{id} ( atless 3 node working ) 
       //todo: do grid computing
     } 
-    else if (request.data?.type == "response_ai_compute") {
-      //todo: each part{id} will compare result (cause sent to atless 2 node)
-      //todo: combin grind computing all parts -> finally value computed 
-      //todo: if dont want computing re-broadcast 
-    }  
+   
     */
     msg.sign(nodeAddress!.key!);
 

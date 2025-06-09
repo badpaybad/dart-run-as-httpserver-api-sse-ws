@@ -8,12 +8,20 @@ import 'package:inceptor_genesis/src/string_cipher.dart';
 class WebsocketNode {
   final StringCipher _cipher = StringCipher.instance;
 
-  //ip:port
+  /// ip:port seed node,fullnode
   final List<String> nodeAddresses;
-  //ip:port
+
+  Map<String, WebSocket> _ipPortLanNodesConnected = {};
+
+  /// ip:port
   final String selfIpPort;
+
+  /// splited from selfIpPort
   final String selfIp;
+
+  /// splited from selfIpPort
   final int selfPort;
+
   final Map<String, WebSocket> socketsConnect2OtherNodes = {};
   final Set<WebSocket> clientsConnectedFromOthers = {};
   HttpServer? selfServer;
@@ -80,28 +88,44 @@ class WebsocketNode {
         "http://$selfIp:$selfPort/nodes/valid/${Uri.encodeComponent(keyDiscoveryTester!.val!)}";
 
     print("restful api: $ipPortApi");
+  }
 
-    var tdiscovery = Timer.periodic(Duration(seconds: 60), (t) async {
-      if (_isShutdown) {
-        t?.cancel();
-        return;
-      }
+  Future<void> _discorveryAutoIpPort4NodesSibling() async {
+    if (_isShutdown) {
+      return;
+    }
+    try {
       if (_publicIp != null) {
-        await _validIp2ConnectNode(_publicIp!);
+        _publicIp = _normalizeAddress(_publicIp!);
+        await _validIpSibling2ConnectNode(_publicIp!);
       }
 
       if (_localLanIp != null) {
         var ipslan = _ipLanSameSubnet(_localLanIp!);
-        ipslan = ["192.168.4.248"];
+        // ipslan = ["192.168.4.248"];
+
+        // print("_ipLanSameSubnet: $ipslan");
+
         for (var ip in ipslan) {
-          await _validIp2ConnectNode(ip);
-          await Future.delayed(Duration(seconds: 1));
+          ip = _normalizeAddress(ip);
+          if (_ipPortLanNodesConnected.containsKey(ip)) {
+            continue;
+          }
+
+          await _validIpSibling2ConnectNode(ip);
+          await Future.delayed(Duration(milliseconds: 10));
         }
       }
-    });
+    } catch (ex) {
+      print("ERR:_discorveryAutoIpPort4NodesSibling:$ex");
+    } finally {
+      await Future.delayed(Duration(seconds: 60));
+    }
+    await _discorveryAutoIpPort4NodesSibling();
   }
 
   List<String> _ipLanSameSubnet(String myIp) {
+    myIp = _normalizeAddress(myIp);
     final subnet = myIp.substring(
       0,
       myIp.lastIndexOf('.'),
@@ -114,33 +138,57 @@ class WebsocketNode {
     return res;
   }
 
-  Future<void> _validIp2ConnectNode(String ip) async {
+  Future<void> _validIpSibling2ConnectNode(String ipSibling) async {
+    ipSibling = _normalizeAddress(ipSibling);
+
+    if (_ipPortLanNodesConnected.containsKey(ipSibling) ||
+        socketsConnect2OtherNodes.containsKey(ipSibling)) {
+      return;
+    }
+
     var ipPort =
-        "http://$ip:9990/nodes/valid/${Uri.encodeComponent(keyDiscoveryTester!.val!)}";
+        "http://$ipSibling:$selfPort/nodes/valid/${Uri.encodeComponent(keyDiscoveryTester!.val!)}";
 
     try {
-      final response = await http.get(Uri.parse('$ipPort'));
+      final response = await http
+          .get(Uri.parse('$ipPort'))
+          .timeout(Duration(seconds: 5));
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
         var ips = "${data["ips"]}";
         var signed = data["signed"];
         var isvalid = _cipher.verify(ips, signed, "${keyDiscoveryTester!.val}");
         if (isvalid) {
-          var listip = ips.split(',');
+          var listip = ips.split(
+            ',',
+          ); //this response come from remote ip in same LAN ( cotnain ip LAN, ip public its self)
+          //ip : found = same subnet
+          listip.add(ipSibling);
+
+          listip = Set<String>.from(listip).toList();
 
           for (var ip in listip) {
-            if (ip.isNotEmpty) {
-              if (ip.indexOf(":") > 0) {
-                connectToNode("$ip");
-              } else {
-                connectToNode("$ip:$selfPort");
+            try {
+              if (ip.isNotEmpty) {
+                if (ip.indexOf(":") > 0) {
+                  connectToNode("$ip", true);
+                } else {
+                  connectToNode("$ip:$selfPort", true);
+                }
+                await Future.delayed(Duration(milliseconds: 10));
               }
+            } catch (exip) {
+              // print('_validIpSibling2ConnectNode:ERR:$ipPort: $exip $listip');
             }
           }
         }
+      } else {
+        // print(
+        //   '$ipSibling:_validIpSibling2ConnectNode:ERR:$ipPort: ${response.statusCode} ${response.body}',
+        // );
       }
     } catch (e) {
-      // print('_validIp2ConnectNode:ERR:$ipPort: $e');
+      // print('$ipSibling:_validIpSibling2ConnectNode:ERR:$ipPort: $e');
     }
   }
 
@@ -154,6 +202,8 @@ class WebsocketNode {
     await _startSelfServer();
     _isStarted = true;
     _connectToOtherNodes();
+
+    _discorveryAutoIpPort4NodesSibling();
   }
 
   Future<void> addHandlerIncomming(
@@ -239,11 +289,11 @@ class WebsocketNode {
   void _connectToOtherNodes() {
     for (final address in nodeAddresses) {
       if (address == selfIpPort) continue;
-      connectToNode(address);
+      connectToNode(address, false);
     }
   }
 
-  void connectToNodeForce(String address) {
+  void connectToNodeForce(String address, bool isLanIpPort) {
     try {
       socketsConnect2OtherNodes[address]!.close();
     } catch (e) {}
@@ -251,18 +301,28 @@ class WebsocketNode {
       socketsConnect2OtherNodes.remove(address);
     } catch (e) {}
 
-    _scheduleReconnect(address);
+    _scheduleReconnect(address, isLanIpPort);
   }
 
-  void connectToNode(String address) async {
+  String _normalizeAddress(String ipport) {
+    ipport = ipport.replaceAll("http://", "");
+    ipport = ipport.replaceAll("https://", "");
+    var idx = ipport.indexOf('//');
+    if (idx >= 0) {
+      ipport = ipport.substring(idx + 1);
+    }
+    return ipport.trim();
+  }
+
+  void connectToNode(String address, bool isLanIpPort) async {
+    address = _normalizeAddress(address);
+
     if (_localLanIp != null && address.contains("$_localLanIp:$selfPort")) {
       return;
     }
     if (address.contains("0.0.0.0:$selfPort")) {
       return;
     }
-    address = address.replaceAll("http://", "");
-    address = address.replaceAll("https://", "");
 
     if (socketsConnect2OtherNodes.containsKey(address)) return;
 
@@ -272,17 +332,29 @@ class WebsocketNode {
       socketsConnect2OtherNodes[address] = socket;
       print('$selfIpPort Đã kết nối tới $address');
 
+      if (isLanIpPort) {
+        _ipPortLanNodesConnected[address] = socket;
+      }
+
+      // print("--------------------------------------------");
+      // print(socketsConnect2OtherNodes.keys);
+      // print(_ipPortLanNodesConnected.keys);
+
       socket.listen(
-        (data) => _handleIncoming(socket, data, isServerSide: false),
+        (data) {
+          _handleIncoming(socket, data, isServerSide: false);
+        },
         onDone: () {
           print('$selfIpPort Ngắt kết nối từ $address');
           socketsConnect2OtherNodes.remove(address);
-          _scheduleReconnect(address);
+          _ipPortLanNodesConnected.remove(address);
+          _scheduleReconnect(address, isLanIpPort);
         },
         onError: (e) {
           print('$selfIpPort Lỗi từ $address: $e');
           socketsConnect2OtherNodes.remove(address);
-          _scheduleReconnect(address);
+          _ipPortLanNodesConnected.remove(address);
+          _scheduleReconnect(address, isLanIpPort);
         },
         cancelOnError: true,
       );
@@ -290,12 +362,16 @@ class WebsocketNode {
       //print('$selfIpPort Kết nối thất bại tới $address: $e');
 
       socketsConnect2OtherNodes.remove(address);
-      _scheduleReconnect(address);
+      _ipPortLanNodesConnected.remove(address);
+      _scheduleReconnect(address, isLanIpPort);
     }
   }
 
-  void _scheduleReconnect(String address) {
-    Timer(Duration(seconds: 5), () => connectToNode(address));
+  void _scheduleReconnect(String address, bool isLanIpPort) {
+    Timer(
+      Duration(seconds: isLanIpPort ? 60 : 10),
+      () => connectToNode(address, isLanIpPort),
+    );
   }
 
   /// Gửi tới tất cả node khác (client + server)
