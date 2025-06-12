@@ -30,7 +30,7 @@ class Block implements MessageBase, IEntity {
   String? previousHash;
   String? hash;
   int nonce = 0;
-  int difficulty = 2;
+  int difficulty = 3;
   String? merkleRoot;
   double? gasLimit;
   double? gasUse;
@@ -41,7 +41,9 @@ class Block implements MessageBase, IEntity {
 
   Block() {}
 
-  static Future<Block> createGenesisBlock() async {
+  static Future<Block> createGenesisBlock({
+    fullpathfile = "/work/genesis.json",
+  }) async {
     Block genesis = Block();
     genesis.indexNo = 0;
     genesis.previousHash = "0";
@@ -53,13 +55,13 @@ class Block implements MessageBase, IEntity {
     genesis.gasUse = 0;
     genesis.nonce = 0;
 
-    await genesis.mine(-1, genesis._cipher.generateSha256(genesis.id));
+    await genesis.mine(-1, genesis.computeHash());
 
-    if(genesis.isValidHash()== false){
-        throw Exception("Invalid hash");
+    if (genesis.isValidHash() == false) {
+      throw Exception("Invalid hash");
     }
 
-    final file = File('/work/genesis.json');
+    final file = File(fullpathfile);
     file.writeAsStringSync("$genesis");
 
     print("$genesis");
@@ -68,7 +70,7 @@ class Block implements MessageBase, IEntity {
 
   static Block getGenesisBlock() {
     var obj = jsonDecode(
-      '{"nodeId":null,"id":"684655e0008b3bbb383d8a8e","isServer":null,"dataType":"block","messageSigned":null,"trackingCounter":0,"createdAt":1749439968181,"indexNo":0,"previousHash":"8bb6d534934c230befba18af65900790207c63929e5b89bca2fdeaaabdbffc86","hash":"5c177666006ce6d6d5c49b755cf4e1253062e6a9c120130273046ffc0f5df21e","nonce":1749439968221,"difficulty":2,"merkleRoot":null,"gasLimit":10000.0,"gasUse":0.0,"trans":[],"reward":0.0}',
+      '{"nodeId":null,"id":"68494459fd6c82be606ec7d1","isServer":null,"dataType":"block","messageSigned":null,"trackingCounter":0,"createdAt":1749632089029,"indexNo":0,"previousHash":"57cde4ec5d20c1bef938da0d44f18a681525d57982cd21bbd49af311071d6e06","hash":"e0528c436500933c1327e0eae7e95555460db37030215a8927d0fe07eca581ae","nonce":33,"difficulty":2,"merkleRoot":null,"gasLimit":10000.0,"gasUse":0.0,"trans":[],"reward":0.0}',
     );
 
     Block genesis = Block.fromJson(obj);
@@ -78,7 +80,7 @@ class Block implements MessageBase, IEntity {
   }
 
   String computeHash() {
-    //dont change this cause hash of getGenesisBlock depend on it 
+    //dont change this cause hash of getGenesisBlock depend on it
     var dataRaw =
         "$nonce $difficulty $createdAt $nodeId $id $isServer $dataType $indexNo $previousHash $gasLimit $gasUse $reward ${jsonEncode(trans ?? [])}";
 
@@ -89,26 +91,34 @@ class Block implements MessageBase, IEntity {
     return hash == computeHash();
   }
 
-  bool isHashMatchDifficulty(String hash) {
+  bool isHashMatchDifficulty(String hashComputed) {
     //todo: poc of PoW Proof of Work, need do other
     // if (this.hash!.startsWith("00")) {
     //   break;
     // }
-    if (this.difficulty == 2) {
-      var idx21 = hash!.indexOf("21");
-      var idx02 = hash!.indexOf("02");
-      var idx13 = hash!.indexOf("13");
-      if (this.hash!.contains("21") &&
-          this.hash!.contains("02") &&
-          this.hash!.contains("13") &&
+    if (hashComputed == previousHash || this.hash == hashComputed) return false;
+
+    if (this.difficulty == 3) {
+      var idx21 = hashComputed!.indexOf("21");
+      var idx02 = hashComputed!.indexOf("02");
+      var idx13 = hashComputed!.indexOf("13");
+      if (hashComputed!.contains("21") &&
+          hashComputed!.contains("02") &&
+          hashComputed!.contains("13") &&
           idx21 > idx02 &&
           idx02 > idx13) {
         return true;
       }
+    } else if (this.difficulty == 2) {
+      if (hashComputed!.contains("21") &&
+          hashComputed!.contains("02") &&
+          hashComputed!.contains("13")) {
+        return true;
+      }
     } else {
-      if (this.hash!.contains("21") &&
-          this.hash!.contains("02") &&
-          this.hash!.contains("13")) {
+      if (hashComputed!.contains("21") ||
+          hashComputed!.contains("02") ||
+          hashComputed!.contains("13")) {
         return true;
       }
     }
@@ -117,19 +127,22 @@ class Block implements MessageBase, IEntity {
   }
 
   Future<Block> mine(int previousIndexNo, String previousHash) async {
-    //base on logic should init other data for block before mine: eg reward ... 
+    //base on logic should init other data for block before mine: eg reward ...
     this.previousHash = previousHash;
     this.indexNo = previousIndexNo + 1;
-    this.nonce = createdAt;
+    this.nonce = 0;
 
     while (true) {
-      this.hash = this.computeHash();
+      var hashcomputed = this.computeHash();
 
-      if (isHashMatchDifficulty(this.hash!)) {
+      if (isHashMatchDifficulty(hashcomputed)) {
+        this.hash = hashcomputed;
+        print("MINED: $nonce $hash\r\n");
         break;
       }
 
       this.nonce++;
+
       await Future.delayed(Duration(milliseconds: 10));
     }
     return this;

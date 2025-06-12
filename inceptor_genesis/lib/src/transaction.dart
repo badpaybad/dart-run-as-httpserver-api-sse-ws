@@ -1,8 +1,11 @@
 import 'dart:convert';
 
+import 'package:inceptor_genesis/inceptor_genesis.dart';
 import 'package:inceptor_genesis/src/encrypted_key_aes.dart';
 
 class Transaction {
+  String id = "${ObjectId()}";
+  String? fromId;
   String? sender;
   String? recipient;
   String? type;
@@ -16,6 +19,8 @@ class Transaction {
   Transaction() {}
 
   Map<String, dynamic> toJson() => {
+    'id': id,
+    'fromId': fromId,
     'sender': sender,
     'recipient': recipient,
     'type': type,
@@ -27,11 +32,34 @@ class Transaction {
     'keyAes': keyAes,
   };
 
+  Transaction clone() {
+    var cloned = Transaction.fromJson(this.toJson());
+    cloned.signature = null;
+    cloned.fromId = this.id;
+    return cloned;
+  }
+
+  String dataToSign() {
+    return "$id $fromId $sender $recipient $type $data $amount $fee $timestamp $keyAes";
+  }
+
+  void sign(String priveateKeyBase64) {
+    var dataRaw = dataToSign();
+    signature = StringCipher.instance.sign(dataRaw, priveateKeyBase64);
+  }
+
+  bool verify(String publicKeyBase64) {
+    var dataRaw = dataToSign();
+    return StringCipher.instance.verify(dataRaw, signature!, publicKeyBase64);
+  }
+
   factory Transaction.fromJson(Map<String, dynamic> json) {
     double amount = (json['amount'] as num?)?.toDouble() ?? 0.0;
     double fee = (json['fee'] as num?)?.toDouble() ?? 0.0;
 
     Transaction tx = Transaction();
+    tx.id = json['id'];
+    tx.fromId = json['fromId'];
     tx.sender = json['sender'];
     tx.recipient = json['recipient'];
     tx.type = json['type'];
@@ -40,7 +68,10 @@ class Transaction {
     tx.fee = fee;
     tx.timestamp = json['timestamp'];
     tx.signature = json['signature'];
-    tx.keyAes = EncryptedKeyAes.fromJson(json['signature']);
+    tx.keyAes =
+        json['keyAes'] == null
+            ? null
+            : EncryptedKeyAes.fromJson(json['keyAes']);
 
     return tx;
   }

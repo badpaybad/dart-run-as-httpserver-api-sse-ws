@@ -13,7 +13,7 @@ import 'package:inceptor_genesis/inceptor_genesis.dart';
 Future<void> main(List<String> arguments) async {
   var ipnode0 = "0.0.0.0:21213";
 
-  var fullnode = FullNode(ipnode0, []);
+  var fullnode = FullNode("/work", ipnode0, []);
 
   while (true) {
     // for (var c in node1.chats) {

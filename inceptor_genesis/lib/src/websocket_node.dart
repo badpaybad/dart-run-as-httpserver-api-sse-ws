@@ -22,7 +22,9 @@ class WebsocketNode {
   /// splited from selfIpPort
   final int selfPort;
 
+///seed node ips
   final Map<String, WebSocket> socketsConnect2OtherNodes = {};
+  /// other socket connected to this node 
   final Set<WebSocket> clientsConnectedFromOthers = {};
   HttpServer? selfServer;
 

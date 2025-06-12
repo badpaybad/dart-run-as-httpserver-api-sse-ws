@@ -8,11 +8,12 @@ abstract class MessageBase {
   String id = "${ObjectId()}";
   String? nodeId;
   String? dataType;
+  /// this dont use to hash 
   String? messageSigned;
   bool? isServer;
   int createdAt = DateTime.now().toUtc().millisecondsSinceEpoch;
 
-  /// this dont use to sign or verify
+  /// this dont use to sign or verify or hash 
   int? trackingCounter = 0;
 
   void sign(String priveateKeyBase64);
