@@ -22,9 +22,10 @@ class WebsocketNode {
   /// splited from selfIpPort
   final int selfPort;
 
-///seed node ips
+  ///seed node ips
   final Map<String, WebSocket> socketsConnect2OtherNodes = {};
-  /// other socket connected to this node 
+
+  /// other socket connected to this node
   final Set<WebSocket> clientsConnectedFromOthers = {};
   HttpServer? selfServer;
 
@@ -215,6 +216,16 @@ class WebsocketNode {
     _handlersIncomming["$subscriberName"] = handlerIncomming;
   }
 
+  ///  String body = await utf8.decoder.bind(request).join();
+  Future<void> AddApiRoutingHandleIncomming(
+    String uriPath,
+    Future<String> Function(HttpRequest) handle,
+  ) async {
+    _apiRoutingHandler[uriPath] = handle;
+  }
+
+  Map<String, Future<String> Function(HttpRequest)> _apiRoutingHandler = {};
+
   /// WebSocket server lắng nghe các node khác
   Future<void> _startSelfServer() async {
     if (selfIp == "" || selfIp == "0.0.0.0") {
@@ -237,8 +248,23 @@ class WebsocketNode {
       final response = request.response;
       response.headers.set('Access-Control-Allow-Origin', '*');
       response.headers.set('Access-Control-Allow-Headers', 'Cache-Control');
-      if (request.uri.path.startsWith('/nodes/valid/')) {
+      //
+      if (_apiRoutingHandler.containsKey(request.uri.path)) {
+        try {
+          var resdata = await _apiRoutingHandler[request!.uri!.path!]!(request);
+          response
+            ..statusCode = HttpStatus.ok
+            ..write(resdata)
+            ..close();
+        } catch (eapi) {
+          response
+            ..statusCode = HttpStatus.internalServerError
+            ..write("$eapi")
+            ..close();
+        }
+      } else if (request.uri.path.startsWith('/nodes/valid/')) {
         var pubkey = request.uri.path.replaceFirst("/nodes/valid/", "");
+         String body = await utf8.decoder.bind(request).join();
         pubkey = Uri.decodeComponent(pubkey);
         String ips = "";
         if (_cipher.isKeyPairMatch(keyDiscoveryTester!.key!, pubkey)) {
@@ -280,8 +306,8 @@ class WebsocketNode {
         );
       } else {
         request.response
-          ..statusCode = HttpStatus.badRequest
-          ..write('$selfIpPort WebSocket only')
+          ..statusCode = HttpStatus.notFound
+          ..write('$selfIpPort Protocol invalid')
           ..close();
       }
     });

@@ -87,7 +87,7 @@ class LeecherTest {
 
     //
 
-    await Future.delayed(Duration(seconds: 5));
+    await Future.delayed(Duration(seconds: 1));
 
     print("${node1.debugName} ${node1.selfAddress}");
 
